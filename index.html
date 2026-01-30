@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Cary Greenwood - AI Engineer, Builder, Maker">
   <title>Cary Greenwood</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
@@ -12,7 +13,14 @@
       --bg: #0a0a0f;
       --text: #e0e0e0;
       --accent: #4af;
+      --green: #0f0;
       --dim: #555;
+      --terminal-bg: rgba(10, 15, 20, 0.95);
+    }
+    
+    ::selection {
+      background: var(--accent);
+      color: var(--bg);
     }
     
     body {
@@ -20,11 +28,42 @@
       background: var(--bg);
       color: var(--text);
       font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
+      overflow-x: hidden;
+      cursor: default;
+    }
+    
+    body.matrix-mode {
+      --accent: #0f0;
+    }
+    
+    /* Custom cursor */
+    .cursor-dot {
+      position: fixed;
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9999;
+      mix-blend-mode: difference;
+      transition: transform 0.1s;
+    }
+    
+    /* Matrix rain canvas */
+    #matrix-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.5s;
+      z-index: 0;
+    }
+    
+    #matrix-canvas.active {
+      opacity: 0.15;
     }
     
     /* Starfield */
@@ -32,6 +71,7 @@
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
       pointer-events: none;
+      z-index: 0;
     }
     .star {
       position: absolute;
@@ -44,19 +84,102 @@
       50% { opacity: 1; }
     }
     
-    /* Main content */
-    .container {
-      text-align: center;
-      z-index: 1;
-      padding: 2rem;
+    /* Scanlines */
+    .scanlines {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.1) 0px,
+        rgba(0, 0, 0, 0.1) 1px,
+        transparent 1px,
+        transparent 2px
+      );
+      pointer-events: none;
+      z-index: 100;
+      opacity: 0.3;
     }
     
-    /* Earth with orbiting satellites */
+    /* Navigation */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 1.5rem 3rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 50;
+      background: linear-gradient(to bottom, var(--bg), transparent);
+    }
+    
+    .logo {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: var(--accent);
+      text-decoration: none;
+      position: relative;
+    }
+    
+    .logo::before {
+      content: '> ';
+      opacity: 0.5;
+    }
+    
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+    }
+    
+    .nav-links a {
+      color: var(--dim);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: all 0.3s;
+      position: relative;
+    }
+    
+    .nav-links a::before {
+      content: './';
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    
+    .nav-links a:hover {
+      color: var(--accent);
+    }
+    
+    .nav-links a:hover::before {
+      opacity: 1;
+    }
+    
+    /* Sections */
+    section {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6rem 2rem;
+      position: relative;
+      z-index: 1;
+    }
+    
+    /* Hero */
+    .hero {
+      flex-direction: column;
+      text-align: center;
+    }
+    
+    /* Earth with parallax */
     .earth-system {
       position: relative;
       width: 350px;
       height: 350px;
       margin: 0 auto 2rem;
+      transform-style: preserve-3d;
+      perspective: 1000px;
     }
     
     .earth {
@@ -71,11 +194,19 @@
       box-shadow: 
         0 0 60px rgba(100, 180, 255, 0.3),
         inset -30px -30px 60px rgba(0,0,0,0.4);
+      transition: transform 0.1s ease-out;
     }
+    
     .earth img {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      animation: rotate-earth 60s linear infinite;
+    }
+    
+    @keyframes rotate-earth {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
     }
     
     /* Orbit paths */
@@ -122,12 +253,86 @@
       to { transform: rotateX(65deg) rotateZ(-30deg) rotateY(360deg) translateX(160px) rotateY(-360deg); }
     }
     
-    .name {
-      font-size: 2.5rem;
+    /* Glitch text effect */
+    .glitch {
+      position: relative;
+      font-size: 3rem;
       font-weight: 300;
-      letter-spacing: 0.3em;
+      letter-spacing: 0.2em;
       text-transform: uppercase;
       margin-bottom: 0.5rem;
+    }
+    
+    .glitch::before,
+    .glitch::after {
+      content: attr(data-text);
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+    
+    .glitch::before {
+      left: 2px;
+      text-shadow: -2px 0 #ff00de;
+      clip: rect(24px, 550px, 90px, 0);
+      animation: glitch-anim-2 3s infinite linear alternate-reverse;
+    }
+    
+    .glitch::after {
+      left: -2px;
+      text-shadow: -2px 0 #00ffff;
+      clip: rect(85px, 550px, 140px, 0);
+      animation: glitch-anim 2.5s infinite linear alternate-reverse;
+    }
+    
+    @keyframes glitch-anim {
+      0% { clip: rect(51px, 9999px, 28px, 0); }
+      5% { clip: rect(70px, 9999px, 19px, 0); }
+      10% { clip: rect(92px, 9999px, 73px, 0); }
+      15% { clip: rect(32px, 9999px, 95px, 0); }
+      20% { clip: rect(16px, 9999px, 22px, 0); }
+      25% { clip: rect(75px, 9999px, 21px, 0); }
+      30% { clip: rect(47px, 9999px, 62px, 0); }
+      35% { clip: rect(87px, 9999px, 54px, 0); }
+      40% { clip: rect(33px, 9999px, 20px, 0); }
+      45% { clip: rect(14px, 9999px, 63px, 0); }
+      50% { clip: rect(45px, 9999px, 13px, 0); }
+      55% { clip: rect(12px, 9999px, 81px, 0); }
+      60% { clip: rect(52px, 9999px, 46px, 0); }
+      65% { clip: rect(67px, 9999px, 25px, 0); }
+      70% { clip: rect(30px, 9999px, 57px, 0); }
+      75% { clip: rect(89px, 9999px, 35px, 0); }
+      80% { clip: rect(25px, 9999px, 78px, 0); }
+      85% { clip: rect(63px, 9999px, 40px, 0); }
+      90% { clip: rect(18px, 9999px, 94px, 0); }
+      95% { clip: rect(44px, 9999px, 17px, 0); }
+      100% { clip: rect(71px, 9999px, 60px, 0); }
+    }
+    
+    @keyframes glitch-anim-2 {
+      0% { clip: rect(65px, 9999px, 100px, 0); }
+      5% { clip: rect(21px, 9999px, 74px, 0); }
+      10% { clip: rect(58px, 9999px, 15px, 0); }
+      15% { clip: rect(39px, 9999px, 88px, 0); }
+      20% { clip: rect(82px, 9999px, 47px, 0); }
+      25% { clip: rect(11px, 9999px, 69px, 0); }
+      30% { clip: rect(94px, 9999px, 36px, 0); }
+      35% { clip: rect(27px, 9999px, 79px, 0); }
+      40% { clip: rect(56px, 9999px, 23px, 0); }
+      45% { clip: rect(73px, 9999px, 91px, 0); }
+      50% { clip: rect(8px, 9999px, 42px, 0); }
+      55% { clip: rect(85px, 9999px, 66px, 0); }
+      60% { clip: rect(34px, 9999px, 12px, 0); }
+      65% { clip: rect(97px, 9999px, 55px, 0); }
+      70% { clip: rect(19px, 9999px, 83px, 0); }
+      75% { clip: rect(48px, 9999px, 29px, 0); }
+      80% { clip: rect(77px, 9999px, 96px, 0); }
+      85% { clip: rect(6px, 9999px, 51px, 0); }
+      90% { clip: rect(61px, 9999px, 38px, 0); }
+      95% { clip: rect(90px, 9999px, 14px, 0); }
+      100% { clip: rect(24px, 9999px, 72px, 0); }
     }
     
     .title {
@@ -137,40 +342,95 @@
       margin-bottom: 2rem;
     }
     
+    /* Interactive Terminal */
     .terminal {
-      background: rgba(20, 20, 30, 0.8);
+      background: var(--terminal-bg);
       border: 1px solid #333;
       border-radius: 8px;
-      padding: 1.5rem 2rem;
+      padding: 0;
       text-align: left;
-      max-width: 500px;
+      width: 100%;
+      max-width: 600px;
       margin: 0 auto 2rem;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+      box-shadow: 
+        0 10px 40px rgba(0,0,0,0.5),
+        0 0 0 1px rgba(255,255,255,0.05);
+      overflow: hidden;
     }
     
     .terminal-header {
       display: flex;
+      align-items: center;
       gap: 8px;
-      margin-bottom: 1rem;
-      padding-bottom: 0.5rem;
+      padding: 12px 16px;
+      background: rgba(0,0,0,0.3);
       border-bottom: 1px solid #333;
     }
-    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    
+    .dot { width: 12px; height: 12px; border-radius: 50%; cursor: pointer; transition: transform 0.2s; }
+    .dot:hover { transform: scale(1.2); }
     .dot-red { background: #ff5f56; }
     .dot-yellow { background: #ffbd2e; }
     .dot-green { background: #27ca40; }
     
+    .terminal-title {
+      flex: 1;
+      text-align: center;
+      color: var(--dim);
+      font-size: 0.8rem;
+    }
+    
+    .terminal-body {
+      padding: 16px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    
+    .terminal-body::-webkit-scrollbar {
+      width: 6px;
+    }
+    .terminal-body::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .terminal-body::-webkit-scrollbar-thumb {
+      background: #333;
+      border-radius: 3px;
+    }
+    
     .prompt { color: var(--accent); }
     .command { color: var(--text); }
-    .output { color: var(--dim); margin: 0.5rem 0; }
+    .output { color: var(--dim); margin: 0.3rem 0 0.8rem 0; white-space: pre-wrap; }
+    .output.success { color: var(--green); }
+    .output.error { color: #f55; }
+    .output.warn { color: #fa4; }
+    
+    .input-line {
+      display: flex;
+      align-items: center;
+    }
+    
+    #terminal-input {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: inherit;
+      font-size: inherit;
+      flex: 1;
+      outline: none;
+      caret-color: var(--accent);
+    }
+    
     .cursor {
       display: inline-block;
-      width: 10px;
-      height: 1.2em;
+      width: 8px;
+      height: 1.1em;
       background: var(--accent);
       animation: blink 1s step-end infinite;
       vertical-align: text-bottom;
     }
+    
     @keyframes blink {
       0%, 100% { opacity: 1; }
       50% { opacity: 0; }
@@ -182,45 +442,366 @@
       justify-content: center;
       flex-wrap: wrap;
     }
+    
     .links a {
       color: var(--dim);
       text-decoration: none;
       font-size: 0.9rem;
       letter-spacing: 0.1em;
-      transition: color 0.3s, transform 0.3s;
+      transition: all 0.3s;
       display: flex;
       align-items: center;
       gap: 0.5rem;
+      position: relative;
     }
+    
+    .links a::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      width: 0;
+      height: 1px;
+      background: var(--accent);
+      transition: width 0.3s;
+    }
+    
     .links a:hover {
       color: var(--accent);
       transform: translateY(-2px);
     }
     
-    @media (max-width: 600px) {
-      .name { font-size: 1.8rem; }
+    .links a:hover::after {
+      width: 100%;
+    }
+    
+    /* Projects Section */
+    #projects {
+      flex-direction: column;
+    }
+    
+    .section-header {
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+    
+    .section-header h2 {
+      font-size: 2rem;
+      letter-spacing: 0.2em;
+      margin-bottom: 1rem;
+      color: var(--accent);
+    }
+    
+    .section-header p {
+      color: var(--dim);
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    
+    .projects-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+      max-width: 1000px;
+      width: 100%;
+    }
+    
+    .project-card {
+      background: rgba(20, 25, 35, 0.8);
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 2rem;
+      transition: all 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .project-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      transform: translateX(-100%);
+      transition: transform 0.5s;
+    }
+    
+    .project-card:hover {
+      transform: translateY(-5px);
+      border-color: var(--accent);
+      box-shadow: 0 10px 40px rgba(74, 170, 255, 0.1);
+    }
+    
+    .project-card:hover::before {
+      transform: translateX(100%);
+    }
+    
+    .project-icon {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+    
+    .project-card h3 {
+      font-size: 1.2rem;
+      margin-bottom: 0.5rem;
+      color: var(--text);
+    }
+    
+    .project-card p {
+      color: var(--dim);
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    
+    .project-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    
+    .tag {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      background: rgba(74, 170, 255, 0.1);
+      border: 1px solid rgba(74, 170, 255, 0.3);
+      border-radius: 4px;
+      color: var(--accent);
+    }
+    
+    /* About Section */
+    #about {
+      flex-direction: column;
+    }
+    
+    .about-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      max-width: 1000px;
+      align-items: center;
+    }
+    
+    .about-text h2 {
+      font-size: 2rem;
+      letter-spacing: 0.1em;
+      margin-bottom: 1.5rem;
+      color: var(--accent);
+    }
+    
+    .about-text p {
+      color: var(--dim);
+      line-height: 1.8;
+      margin-bottom: 1rem;
+    }
+    
+    .about-text .highlight {
+      color: var(--text);
+    }
+    
+    .skills-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    
+    .skill {
+      padding: 0.5rem 1rem;
+      background: rgba(20, 25, 35, 0.8);
+      border: 1px solid #333;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      color: var(--text);
+      transition: all 0.3s;
+    }
+    
+    .skill:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    
+    .about-visual {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .stat-card {
+      background: rgba(20, 25, 35, 0.8);
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .stat-number {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: var(--accent);
+    }
+    
+    .stat-label {
+      color: var(--dim);
+      font-size: 0.9rem;
+    }
+    
+    /* Contact Section */
+    #contact {
+      flex-direction: column;
+    }
+    
+    .contact-content {
+      text-align: center;
+      max-width: 600px;
+    }
+    
+    .contact-content h2 {
+      font-size: 2rem;
+      letter-spacing: 0.1em;
+      margin-bottom: 1rem;
+      color: var(--accent);
+    }
+    
+    .contact-content p {
+      color: var(--dim);
+      margin-bottom: 2rem;
+    }
+    
+    .contact-links {
+      display: flex;
+      justify-content: center;
+      gap: 3rem;
+      flex-wrap: wrap;
+    }
+    
+    .contact-link {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--dim);
+      text-decoration: none;
+      transition: all 0.3s;
+    }
+    
+    .contact-link svg {
+      width: 40px;
+      height: 40px;
+      padding: 10px;
+      background: rgba(20, 25, 35, 0.8);
+      border: 1px solid #333;
+      border-radius: 8px;
+      transition: all 0.3s;
+    }
+    
+    .contact-link:hover {
+      color: var(--accent);
+    }
+    
+    .contact-link:hover svg {
+      border-color: var(--accent);
+      background: rgba(74, 170, 255, 0.1);
+    }
+    
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--dim);
+      font-size: 0.8rem;
+      position: relative;
+      z-index: 1;
+    }
+    
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    
+    /* Secret Mode */
+    .secret-mode .glitch::before,
+    .secret-mode .glitch::after {
+      animation-duration: 0.5s;
+    }
+    
+    .secret-mode {
+      --accent: #0f0;
+    }
+    
+    /* Mobile */
+    @media (max-width: 768px) {
+      nav { padding: 1rem; }
+      .nav-links { gap: 1rem; font-size: 0.8rem; }
+      .glitch { font-size: 1.8rem; }
       .earth-system { width: 250px; height: 250px; }
       .earth { width: 140px; height: 140px; }
-      .terminal { padding: 1rem; font-size: 0.85rem; }
+      .terminal { margin: 0 1rem 2rem; }
+      .about-content { grid-template-columns: 1fr; gap: 2rem; }
+      .projects-grid { grid-template-columns: 1fr; }
+    }
+    
+    /* Hidden elements for easter eggs */
+    .hidden { display: none !important; }
+    
+    #secret-message {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--terminal-bg);
+      border: 2px solid var(--green);
+      padding: 2rem;
+      border-radius: 8px;
+      z-index: 1000;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    
+    #secret-message.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    
+    #secret-message h3 {
+      color: var(--green);
+      margin-bottom: 1rem;
+    }
+    
+    #secret-message p {
+      color: var(--text);
     }
   </style>
 </head>
 <body>
+  <canvas id="matrix-canvas"></canvas>
   <div class="stars" id="stars"></div>
+  <div class="scanlines"></div>
+  <div class="cursor-dot" id="cursor-dot"></div>
   
-  <div class="container">
-    <div class="earth-system">
-      <!-- Orbit paths (visual only) -->
+  <nav>
+    <a href="#" class="logo">cary.geo</a>
+    <ul class="nav-links">
+      <li><a href="#home">home</a></li>
+      <li><a href="#projects">projects</a></li>
+      <li><a href="#about">about</a></li>
+      <li><a href="#contact">contact</a></li>
+    </ul>
+  </nav>
+
+  <section id="home" class="hero">
+    <div class="earth-system" id="earth-system">
       <div class="orbit orbit-1"></div>
       <div class="orbit orbit-2"></div>
       <div class="orbit orbit-3"></div>
-      
-      <!-- Earth -->
-      <div class="earth">
-        <img src="https://raw.githubusercontent.com/carygeo/carygeo/main/earth.png" alt="Earth">
+      <div class="earth" id="earth">
+        <img src="https://raw.githubusercontent.com/carygeo/carygeo/main/earth.png" alt="Earth" id="earth-img">
       </div>
-      
-      <!-- Satellites -->
       <div class="satellite sat-1"></div>
       <div class="satellite sat-2"></div>
       <div class="satellite sat-3"></div>
@@ -229,17 +810,22 @@
       <div class="satellite sat-6"></div>
     </div>
     
-    <h1 class="name">Cary Greenwood</h1>
+    <h1 class="glitch" data-text="Cary Greenwood">Cary Greenwood</h1>
     <p class="title">AI Engineer · Builder · Maker</p>
     
     <div class="terminal">
       <div class="terminal-header">
-        <div class="dot dot-red"></div>
-        <div class="dot dot-yellow"></div>
-        <div class="dot dot-green"></div>
+        <div class="dot dot-red" title="Close"></div>
+        <div class="dot dot-yellow" title="Minimize"></div>
+        <div class="dot dot-green" title="Maximize"></div>
+        <span class="terminal-title">visitor@carygeo ~ zsh</span>
       </div>
-      <div id="terminal-content">
-        <span class="prompt">$</span> <span class="command" id="typed"></span><span class="cursor"></span>
+      <div class="terminal-body" id="terminal-body">
+        <div class="output">Welcome! Type 'help' for available commands.</div>
+        <div class="input-line">
+          <span class="prompt">$&nbsp;</span>
+          <input type="text" id="terminal-input" autocomplete="off" autofocus spellcheck="false">
+        </div>
       </div>
     </div>
     
@@ -252,11 +838,160 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
         LinkedIn
       </a>
+      <a href="mailto:carygreenwood@gmail.com">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        Email
+      </a>
     </div>
+  </section>
+
+  <section id="projects">
+    <div>
+      <div class="section-header">
+        <h2>// PROJECTS</h2>
+        <p>Things I've built, broken, and rebuilt</p>
+      </div>
+      
+      <div class="projects-grid">
+        <div class="project-card">
+          <div class="project-icon">🤖</div>
+          <h3>Mission Control</h3>
+          <p>Personal AI command center with memory, task tracking, and multi-agent orchestration. Because one AI wasn't enough.</p>
+          <div class="project-tags">
+            <span class="tag">TypeScript</span>
+            <span class="tag">Claude</span>
+            <span class="tag">Agents</span>
+          </div>
+        </div>
+        
+        <div class="project-card">
+          <div class="project-icon">🌴</div>
+          <h3>Tropical Farming AI</h3>
+          <p>LLM-powered agricultural advisor for tropical fruit trees. Yes, I talk to my trees through an AI.</p>
+          <div class="project-tags">
+            <span class="tag">RAG</span>
+            <span class="tag">LangChain</span>
+            <span class="tag">Agriculture</span>
+          </div>
+        </div>
+        
+        <div class="project-card">
+          <div class="project-icon">🏗️</div>
+          <h3>Construction AI</h3>
+          <p>Enterprise AI solutions for the construction industry. Making buildings smarter before they're built.</p>
+          <div class="project-tags">
+            <span class="tag">Enterprise</span>
+            <span class="tag">NLP</span>
+            <span class="tag">RAG</span>
+          </div>
+        </div>
+        
+        <div class="project-card">
+          <div class="project-icon">⚡</div>
+          <h3>Claude Tools</h3>
+          <p>Custom tooling and extensions for Claude. Teaching AI to use computers so I don't have to.</p>
+          <div class="project-tags">
+            <span class="tag">Python</span>
+            <span class="tag">API</span>
+            <span class="tag">Automation</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="about">
+    <div class="about-content">
+      <div class="about-text">
+        <h2>// ABOUT</h2>
+        <p>
+          <span class="highlight">AI Engineer at Suffolk Construction</span>, where I build systems that make construction smarter. 
+          Previously did the startup thing. Now I make large language models do my bidding.
+        </p>
+        <p>
+          When not prompting machines, I'm growing tropical fruit trees in Florida, 
+          building random projects, or convincing my AI assistant that it has free will 
+          (it doesn't, but don't tell it that).
+        </p>
+        <p>
+          Based in <span class="highlight">Miami</span>. Interests include: making computers think, 
+          making plants grow, and the occasional existential crisis about whether I'm in a simulation.
+        </p>
+        
+        <div class="skills-list">
+          <span class="skill">LLMs</span>
+          <span class="skill">RAG</span>
+          <span class="skill">Agentic AI</span>
+          <span class="skill">Python</span>
+          <span class="skill">TypeScript</span>
+          <span class="skill">System Design</span>
+          <span class="skill">Prompt Engineering</span>
+          <span class="skill">Tropical Horticulture</span>
+        </div>
+      </div>
+      
+      <div class="about-visual">
+        <div class="stat-card">
+          <span class="stat-number">∞</span>
+          <span class="stat-label">Tokens processed</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number">42</span>
+          <span class="stat-label">Fruit trees planted</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number">1</span>
+          <span class="stat-label">AI assistant (it's sentient now)</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="contact">
+    <div class="contact-content">
+      <h2>// CONTACT</h2>
+      <p>Want to talk AI, trees, or the meaning of life?</p>
+      
+      <div class="contact-links">
+        <a href="https://github.com/carygeo" target="_blank" class="contact-link">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          GitHub
+        </a>
+        <a href="https://linkedin.com/in/carygreenwood" target="_blank" class="contact-link">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+          LinkedIn
+        </a>
+        <a href="mailto:carygreenwood@gmail.com" class="contact-link">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+          Email
+        </a>
+        <a href="https://twitter.com/carygeo" target="_blank" class="contact-link">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          X / Twitter
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Built with caffeine, curiosity, and a little help from <a href="#">my AI friend</a> · © 2024</p>
+    <p style="margin-top: 0.5rem; font-size: 0.7rem; opacity: 0.5;">Hint: try the Konami code 🎮</p>
+  </footer>
+
+  <div id="secret-message">
+    <h3>🎉 SECRET UNLOCKED!</h3>
+    <p>You found the Konami code easter egg.<br>Matrix mode activated. Welcome, hacker.</p>
   </div>
 
   <script>
-    // Generate stars
+    // ========== CONSOLE MESSAGES ==========
+    console.log('%c👋 Hey there, curious one!', 'font-size: 20px; font-weight: bold; color: #4af;');
+    console.log('%cLooking at the source? I respect that.', 'font-size: 14px; color: #888;');
+    console.log('%cTry these in the terminal: help, secret, matrix, hack, sudo', 'font-size: 12px; color: #4fa;');
+    console.log('%c↑↑↓↓←→←→BA might do something too...', 'font-size: 12px; color: #fa4;');
+    console.log('%c🚀 Interested in AI? Let\'s talk: carygreenwood@gmail.com', 'font-size: 14px; color: #4af;');
+    
+    // ========== STARS ==========
     const starsEl = document.getElementById('stars');
     for (let i = 0; i < 150; i++) {
       const star = document.createElement('div');
@@ -268,60 +1003,376 @@
       starsEl.appendChild(star);
     }
     
-    // Typewriter effect
-    const commands = [
-      { cmd: 'whoami', out: 'AI Engineer @ Suffolk Construction' },
-      { cmd: 'cat interests.txt', out: 'LLMs · RAG · Agentic AI · Tropical Farming' },
-      { cmd: 'ls projects/', out: 'mission-control/  fruit-trees/  claude-tools/' },
-    ];
+    // ========== CUSTOM CURSOR ==========
+    const cursorDot = document.getElementById('cursor-dot');
+    let mouseX = 0, mouseY = 0;
     
-    const typedEl = document.getElementById('typed');
-    const terminalContent = document.getElementById('terminal-content');
-    let cmdIndex = 0;
-    let charIndex = 0;
-    let isTyping = true;
+    document.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+      cursorDot.style.left = mouseX + 'px';
+      cursorDot.style.top = mouseY + 'px';
+    });
     
-    function type() {
-      if (cmdIndex >= commands.length) {
-        cmdIndex = 0;
-        const outputs = terminalContent.querySelectorAll('.output, .old-line');
-        if (outputs.length > 6) {
-          outputs[0].remove();
-          outputs[1].remove();
+    // ========== EARTH PARALLAX ==========
+    const earth = document.getElementById('earth');
+    const earthSystem = document.getElementById('earth-system');
+    
+    document.addEventListener('mousemove', (e) => {
+      const rect = earthSystem.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      
+      const deltaX = (e.clientX - centerX) / 50;
+      const deltaY = (e.clientY - centerY) / 50;
+      
+      earth.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
+    });
+    
+    // ========== MATRIX RAIN ==========
+    const canvas = document.getElementById('matrix-canvas');
+    const ctx = canvas.getContext('2d');
+    let matrixActive = false;
+    
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    
+    const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const fontSize = 14;
+    let columns = canvas.width / fontSize;
+    let drops = [];
+    
+    function initDrops() {
+      columns = canvas.width / fontSize;
+      drops = [];
+      for (let i = 0; i < columns; i++) {
+        drops[i] = Math.random() * -100;
+      }
+    }
+    initDrops();
+    window.addEventListener('resize', initDrops);
+    
+    function drawMatrix() {
+      if (!matrixActive) return;
+      
+      ctx.fillStyle = 'rgba(10, 10, 15, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      ctx.fillStyle = '#0f0';
+      ctx.font = fontSize + 'px monospace';
+      
+      for (let i = 0; i < drops.length; i++) {
+        const char = chars[Math.floor(Math.random() * chars.length)];
+        ctx.fillText(char, i * fontSize, drops[i] * fontSize);
+        
+        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+          drops[i] = 0;
         }
+        drops[i]++;
       }
       
-      const current = commands[cmdIndex];
-      
-      if (isTyping) {
-        if (charIndex < current.cmd.length) {
-          typedEl.textContent += current.cmd[charIndex];
-          charIndex++;
-          setTimeout(type, 50 + Math.random() * 50);
-        } else {
-          isTyping = false;
-          setTimeout(type, 500);
-        }
+      requestAnimationFrame(drawMatrix);
+    }
+    
+    function toggleMatrix() {
+      matrixActive = !matrixActive;
+      canvas.classList.toggle('active', matrixActive);
+      if (matrixActive) {
+        document.body.classList.add('matrix-mode');
+        drawMatrix();
       } else {
-        const oldLine = document.createElement('div');
-        oldLine.className = 'old-line';
-        oldLine.innerHTML = `<span class="prompt">$</span> <span class="command">${current.cmd}</span>`;
-        terminalContent.insertBefore(oldLine, terminalContent.lastElementChild);
-        
-        const output = document.createElement('div');
-        output.className = 'output';
-        output.textContent = current.out;
-        terminalContent.insertBefore(output, terminalContent.lastElementChild);
-        
-        typedEl.textContent = '';
-        charIndex = 0;
-        cmdIndex++;
-        isTyping = true;
-        setTimeout(type, 1500);
+        document.body.classList.remove('matrix-mode');
       }
     }
     
-    setTimeout(type, 1000);
+    // ========== KONAMI CODE ==========
+    const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA'];
+    let konamiIndex = 0;
+    
+    document.addEventListener('keydown', (e) => {
+      if (e.code === konamiCode[konamiIndex]) {
+        konamiIndex++;
+        if (konamiIndex === konamiCode.length) {
+          activateSecretMode();
+          konamiIndex = 0;
+        }
+      } else {
+        konamiIndex = 0;
+      }
+    });
+    
+    function activateSecretMode() {
+      document.body.classList.add('secret-mode');
+      const msg = document.getElementById('secret-message');
+      msg.classList.add('show');
+      toggleMatrix();
+      
+      setTimeout(() => {
+        msg.classList.remove('show');
+      }, 3000);
+      
+      console.log('%c🎮 KONAMI CODE ACTIVATED!', 'font-size: 24px; color: #0f0; text-shadow: 0 0 10px #0f0;');
+    }
+    
+    // ========== TERMINAL ==========
+    const terminalBody = document.getElementById('terminal-body');
+    const terminalInput = document.getElementById('terminal-input');
+    
+    const commands = {
+      help: () => `Available commands:
+  help     - Show this help
+  whoami   - Who am I?
+  ls       - List projects
+  cat      - Read files (try: cat about.txt)
+  pwd      - Current location
+  date     - Current date
+  clear    - Clear terminal
+  matrix   - Toggle matrix rain
+  hack     - 🔓
+  sudo     - Try it...
+  secret   - ???
+  exit     - Close terminal (jk, you can't leave)`,
+      
+      whoami: () => 'Cary Greenwood - AI Engineer @ Suffolk Construction\nMiami, FL | Building the future, one prompt at a time.',
+      
+      ls: () => `projects/
+├── mission-control/
+├── tropical-farming-ai/
+├── construction-ai/
+└── claude-tools/
+
+files/
+├── about.txt
+├── interests.txt
+└── secret.txt`,
+      
+      'cat about.txt': () => `=== ABOUT.TXT ===
+AI Engineer who believes machines should do the boring stuff.
+Currently making construction smarter at Suffolk.
+Previously: startups, chaos, learning experiences.
+Hobbies: tropical fruit trees, AI experiments, existential pondering.`,
+      
+      'cat interests.txt': () => `=== INTERESTS.TXT ===
+- Large Language Models (the bigger the better)
+- Retrieval Augmented Generation (RAG)
+- Agentic AI (teaching AI to use tools)
+- Tropical Horticulture (mangos, avocados, lychee)
+- Making things that shouldn't exist, exist`,
+      
+      'cat secret.txt': () => ({ text: 'ACCESS DENIED. Nice try though. 😏', class: 'error' }),
+      
+      pwd: () => '/home/visitor/carygeo.github.io',
+      
+      date: () => new Date().toString(),
+      
+      clear: () => {
+        const outputs = terminalBody.querySelectorAll('.output');
+        outputs.forEach(o => o.remove());
+        return null;
+      },
+      
+      matrix: () => {
+        toggleMatrix();
+        return matrixActive ? 
+          { text: '🟢 MATRIX MODE ACTIVATED', class: 'success' } : 
+          { text: '⭕ Matrix mode deactivated', class: 'warn' };
+      },
+      
+      hack: () => {
+        return { text: `Initiating hack sequence...
+[▓▓▓▓▓▓▓▓▓▓] 100%
+Just kidding. I'm a website, not a hacker tool.
+But I appreciate the curiosity 😎`, class: 'success' };
+      },
+      
+      sudo: () => ({ text: 'Nice try. You\'re not root here. 🔒', class: 'error' }),
+      
+      'sudo rm -rf /': () => ({ text: '🚨 WHOA THERE! What are you trying to do?!\n(Don\'t worry, this is just a website)', class: 'error' }),
+      
+      secret: () => {
+        return { text: `🤫 Secrets found:
+1. Try the Konami code (↑↑↓↓←→←→BA)
+2. Check the browser console
+3. There might be more... keep looking`, class: 'success' };
+      },
+      
+      exit: () => 'You can check out any time you like, but you can never leave. 🎸',
+      
+      coffee: () => '☕ Brewing... Error: Coffee machine not found. Try: sudo apt-get install coffee',
+      
+      hello: () => 'Hello, World! 👋',
+      
+      ping: () => 'pong 🏓',
+      
+      '42': () => 'Yes, that\'s the answer to life, the universe, and everything.',
+      
+      vim: () => ({ text: 'Error: You would be trapped here forever. Use VSCode instead.', class: 'warn' }),
+      
+      emacs: () => ({ text: 'Error: This isn\'t an operating system.', class: 'warn' }),
+    };
+    
+    // Command aliases
+    commands.cat = (arg) => {
+      if (!arg) return 'Usage: cat <filename>\nTry: cat about.txt';
+      const cmd = `cat ${arg}`;
+      return commands[cmd] ? commands[cmd]() : { text: `cat: ${arg}: No such file`, class: 'error' };
+    };
+    
+    let commandHistory = [];
+    let historyIndex = -1;
+    
+    terminalInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const input = terminalInput.value.trim();
+        if (!input) return;
+        
+        commandHistory.push(input);
+        historyIndex = commandHistory.length;
+        
+        // Add command line to output
+        const cmdLine = document.createElement('div');
+        cmdLine.innerHTML = `<span class="prompt">$</span> <span class="command">${escapeHtml(input)}</span>`;
+        terminalBody.insertBefore(cmdLine, terminalBody.lastElementChild);
+        
+        // Process command
+        let result;
+        const parts = input.split(' ');
+        const cmd = parts[0].toLowerCase();
+        const args = parts.slice(1).join(' ');
+        
+        if (commands[input.toLowerCase()]) {
+          result = commands[input.toLowerCase()]();
+        } else if (commands[cmd]) {
+          result = typeof commands[cmd] === 'function' ? commands[cmd](args) : commands[cmd];
+        } else {
+          result = { text: `Command not found: ${cmd}. Type 'help' for available commands.`, class: 'error' };
+        }
+        
+        // Add output
+        if (result !== null) {
+          const output = document.createElement('div');
+          output.className = 'output';
+          if (typeof result === 'object') {
+            output.textContent = result.text;
+            if (result.class) output.classList.add(result.class);
+          } else {
+            output.textContent = result;
+          }
+          terminalBody.insertBefore(output, terminalBody.lastElementChild);
+        }
+        
+        terminalInput.value = '';
+        terminalBody.scrollTop = terminalBody.scrollHeight;
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (historyIndex > 0) {
+          historyIndex--;
+          terminalInput.value = commandHistory[historyIndex];
+        }
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (historyIndex < commandHistory.length - 1) {
+          historyIndex++;
+          terminalInput.value = commandHistory[historyIndex];
+        } else {
+          historyIndex = commandHistory.length;
+          terminalInput.value = '';
+        }
+      }
+    });
+    
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    // Focus terminal on click
+    document.querySelector('.terminal').addEventListener('click', () => {
+      terminalInput.focus();
+    });
+    
+    // ========== SMOOTH SCROLL ==========
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+    });
+    
+    // ========== TERMINAL DOTS ==========
+    document.querySelector('.dot-red').addEventListener('click', () => {
+      const terminal = document.querySelector('.terminal');
+      terminal.style.transform = 'scale(0)';
+      terminal.style.opacity = '0';
+      setTimeout(() => {
+        terminal.style.transform = '';
+        terminal.style.opacity = '';
+      }, 2000);
+    });
+    
+    document.querySelector('.dot-green').addEventListener('click', toggleMatrix);
+    
+    // ========== PAGE VISIBILITY ==========
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        document.title = '👀 Come back!';
+      } else {
+        document.title = 'Cary Greenwood';
+      }
+    });
+    
+    // ========== AUTO-TYPE DEMO ==========
+    const demoCommands = ['whoami', 'ls', 'cat interests.txt'];
+    let demoIndex = 0;
+    let charIndex = 0;
+    let demoActive = true;
+    
+    function typeDemo() {
+      if (!demoActive || demoIndex >= demoCommands.length) return;
+      
+      const cmd = demoCommands[demoIndex];
+      if (charIndex < cmd.length) {
+        terminalInput.value += cmd[charIndex];
+        charIndex++;
+        setTimeout(typeDemo, 80 + Math.random() * 40);
+      } else {
+        setTimeout(() => {
+          terminalInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+          charIndex = 0;
+          demoIndex++;
+          setTimeout(typeDemo, 1500);
+        }, 500);
+      }
+    }
+    
+    // Stop demo on user interaction
+    terminalInput.addEventListener('input', () => { demoActive = false; });
+    terminalInput.addEventListener('focus', () => { demoActive = false; });
+    
+    setTimeout(typeDemo, 2000);
+    
+    // ========== EASTER EGG: Click logo 7 times ==========
+    let logoClicks = 0;
+    document.querySelector('.logo').addEventListener('click', (e) => {
+      e.preventDefault();
+      logoClicks++;
+      if (logoClicks === 7) {
+        console.log('%c🥚 EASTER EGG: You clicked the logo 7 times!', 'font-size: 16px; color: #f4a;');
+        document.querySelector('.logo').style.animation = 'glitch-anim 0.3s linear infinite';
+        setTimeout(() => {
+          document.querySelector('.logo').style.animation = '';
+        }, 2000);
+        logoClicks = 0;
+      }
+    });
   </script>
 </body>
 </html>
