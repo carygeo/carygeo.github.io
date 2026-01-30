@@ -51,15 +51,75 @@
       padding: 2rem;
     }
     
-    .earth-container {
-      width: 300px;
-      height: 300px;
+    /* Earth with orbiting satellites */
+    .earth-system {
+      position: relative;
+      width: 350px;
+      height: 350px;
       margin: 0 auto 2rem;
     }
-    .earth-container img {
+    
+    .earth {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      overflow: hidden;
+      box-shadow: 
+        0 0 60px rgba(100, 180, 255, 0.3),
+        inset -30px -30px 60px rgba(0,0,0,0.4);
+    }
+    .earth img {
       width: 100%;
       height: 100%;
-      object-fit: contain;
+      object-fit: cover;
+    }
+    
+    /* Orbit paths */
+    .orbit {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 50%;
+      transform-style: preserve-3d;
+    }
+    
+    .orbit-1 { width: 280px; height: 100px; margin: -50px 0 0 -140px; transform: rotateX(70deg) rotateZ(-10deg); }
+    .orbit-2 { width: 300px; height: 280px; margin: -140px 0 0 -150px; transform: rotateX(75deg) rotateZ(20deg); }
+    .orbit-3 { width: 320px; height: 120px; margin: -60px 0 0 -160px; transform: rotateX(65deg) rotateZ(-30deg); }
+    
+    /* Satellites */
+    .satellite {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 0 10px 2px currentColor;
+    }
+    
+    .sat-1 { color: #4af; animation: orbit1 15s linear infinite; }
+    .sat-2 { color: #4fa; animation: orbit2 20s linear infinite reverse; }
+    .sat-3 { color: #f4a; animation: orbit3 12s linear infinite; }
+    .sat-4 { color: #fa4; animation: orbit1 18s linear infinite; animation-delay: -9s; }
+    .sat-5 { color: #a4f; animation: orbit2 25s linear infinite; animation-delay: -12s; }
+    .sat-6 { color: #4af; animation: orbit3 14s linear infinite reverse; animation-delay: -7s; }
+    
+    @keyframes orbit1 {
+      from { transform: rotateX(70deg) rotateZ(-10deg) rotateY(0deg) translateX(140px) rotateY(0deg); }
+      to { transform: rotateX(70deg) rotateZ(-10deg) rotateY(360deg) translateX(140px) rotateY(-360deg); }
+    }
+    @keyframes orbit2 {
+      from { transform: rotateX(75deg) rotateZ(20deg) rotateY(0deg) translateX(150px) rotateY(0deg); }
+      to { transform: rotateX(75deg) rotateZ(20deg) rotateY(360deg) translateX(150px) rotateY(-360deg); }
+    }
+    @keyframes orbit3 {
+      from { transform: rotateX(65deg) rotateZ(-30deg) rotateY(0deg) translateX(160px) rotateY(0deg); }
+      to { transform: rotateX(65deg) rotateZ(-30deg) rotateY(360deg) translateX(160px) rotateY(-360deg); }
     }
     
     .name {
@@ -137,10 +197,10 @@
       transform: translateY(-2px);
     }
     
-    /* Responsive */
     @media (max-width: 600px) {
       .name { font-size: 1.8rem; }
-      .earth-container { width: 200px; height: 200px; }
+      .earth-system { width: 250px; height: 250px; }
+      .earth { width: 140px; height: 140px; }
       .terminal { padding: 1rem; font-size: 0.85rem; }
     }
   </style>
@@ -149,8 +209,24 @@
   <div class="stars" id="stars"></div>
   
   <div class="container">
-    <div class="earth-container">
-      <img src="https://raw.githubusercontent.com/carygeo/carygeo/main/earth.gif" alt="Earth">
+    <div class="earth-system">
+      <!-- Orbit paths (visual only) -->
+      <div class="orbit orbit-1"></div>
+      <div class="orbit orbit-2"></div>
+      <div class="orbit orbit-3"></div>
+      
+      <!-- Earth -->
+      <div class="earth">
+        <img src="https://raw.githubusercontent.com/carygeo/carygeo/main/earth.png" alt="Earth">
+      </div>
+      
+      <!-- Satellites -->
+      <div class="satellite sat-1"></div>
+      <div class="satellite sat-2"></div>
+      <div class="satellite sat-3"></div>
+      <div class="satellite sat-4"></div>
+      <div class="satellite sat-5"></div>
+      <div class="satellite sat-6"></div>
     </div>
     
     <h1 class="name">Cary Greenwood</h1>
@@ -204,12 +280,10 @@
     let cmdIndex = 0;
     let charIndex = 0;
     let isTyping = true;
-    let currentOutput = null;
     
     function type() {
       if (cmdIndex >= commands.length) {
         cmdIndex = 0;
-        // Clear old outputs after full cycle
         const outputs = terminalContent.querySelectorAll('.output, .old-line');
         if (outputs.length > 6) {
           outputs[0].remove();
@@ -229,7 +303,6 @@
           setTimeout(type, 500);
         }
       } else {
-        // Show output
         const oldLine = document.createElement('div');
         oldLine.className = 'old-line';
         oldLine.innerHTML = `<span class="prompt">$</span> <span class="command">${current.cmd}</span>`;
