@@ -75,7 +75,7 @@
     }
 
     #matrix-canvas,
-    #static-canvas {
+    .noise-overlay {
       position: fixed;
       inset: 0;
       pointer-events: none;
@@ -91,10 +91,14 @@
       opacity: 0.28;
     }
 
-    #static-canvas {
+    .noise-overlay {
       z-index: 2;
       mix-blend-mode: screen;
-      opacity: 0.05;
+      opacity: 0.045;
+      background-image:
+        repeating-radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.22) 0 1px, transparent 1px 9px),
+        repeating-linear-gradient(90deg, transparent 0 46px, rgba(255, 255, 255, 0.12) 46px 47px, transparent 47px 92px);
+      background-size: 180px 180px, 220px 220px;
     }
 
     .grid-floor {
@@ -295,12 +299,32 @@
       transition: transform 0.1s ease-out, filter 0.2s ease;
     }
 
-    .earth img {
-      width: 200%;
-      height: 100%;
-      object-fit: cover;
-      animation: rotate-earth 42s linear infinite;
-      filter: saturate(1.35) contrast(1.08);
+    .earth::before {
+      content: "";
+      position: absolute;
+      inset: -2% -58%;
+      background:
+        radial-gradient(circle at 30% 38%, rgba(183, 255, 39, 0.9) 0 3%, transparent 3.4%),
+        radial-gradient(circle at 47% 55%, rgba(24, 244, 255, 0.8) 0 2.5%, transparent 2.9%),
+        radial-gradient(circle at 62% 36%, rgba(255, 43, 214, 0.72) 0 2%, transparent 2.4%),
+        linear-gradient(100deg, transparent 0 12%, rgba(24, 244, 255, 0.28) 13% 19%, transparent 20% 32%, rgba(183, 255, 39, 0.2) 33% 39%, transparent 40% 57%, rgba(255, 43, 214, 0.22) 58% 64%, transparent 65% 100%),
+        repeating-linear-gradient(12deg, rgba(24, 244, 255, 0.14) 0 2px, transparent 2px 11px),
+        radial-gradient(circle at 48% 50%, rgba(24, 244, 255, 0.28), rgba(24, 244, 255, 0.06) 45%, rgba(0, 0, 0, 0.42) 70%);
+      animation: rotate-earth 48s linear infinite;
+      filter: saturate(1.25) contrast(1.08);
+    }
+
+    .earth::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 34% 32%, rgba(255, 255, 255, 0.18), transparent 22%),
+        linear-gradient(110deg, rgba(255, 255, 255, 0.08), transparent 38%),
+        radial-gradient(circle at 72% 70%, transparent 0 38%, rgba(0, 0, 0, 0.48) 78%);
+      box-shadow: inset -32px -28px 52px rgba(0, 0, 0, 0.62);
+      pointer-events: none;
     }
 
     .orbit {
@@ -671,6 +695,13 @@
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 1rem;
+    }
+
+    #projects,
+    #about,
+    #contact {
+      content-visibility: auto;
+      contain-intrinsic-size: 900px;
     }
 
     .project-card,
@@ -1086,6 +1117,12 @@
       .sat-5 { animation-name: orbit2-mobile; }
       .sat-6 { animation-name: orbit3-mobile; }
 
+      .sat-4,
+      .sat-5,
+      .sat-6 {
+        display: none;
+      }
+
       .radar-card {
         left: 50%;
         bottom: 0;
@@ -1121,7 +1158,7 @@
       }
 
       #matrix-canvas,
-      #static-canvas,
+      .noise-overlay,
       .scanlines {
         display: none;
       }
@@ -1145,7 +1182,7 @@
 </head>
 <body>
   <canvas id="matrix-canvas"></canvas>
-  <canvas id="static-canvas"></canvas>
+  <div class="noise-overlay" aria-hidden="true"></div>
   <div class="grid-floor" aria-hidden="true"></div>
   <div class="scanlines" aria-hidden="true"></div>
   <div class="cursor-dot" id="cursor-dot" aria-hidden="true"></div>
@@ -1172,9 +1209,7 @@
             <div class="orbit orbit-1"></div>
             <div class="orbit orbit-2"></div>
             <div class="orbit orbit-3"></div>
-            <div class="earth" id="earth">
-              <img src="https://raw.githubusercontent.com/carygeo/carygeo/main/earth.png" alt="">
-            </div>
+            <div class="earth" id="earth"></div>
             <div class="satellite sat-1"></div>
             <div class="satellite sat-2"></div>
             <div class="satellite sat-3"></div>
@@ -1216,7 +1251,7 @@
               <div class="output success">BOOT OK: neon drivers loaded, terminal mischievous, orbital snacks missing.</div>
               <div class="input-line">
                 <span class="prompt">$</span>
-                <input type="text" id="terminal-input" autocomplete="off" autofocus spellcheck="false" aria-label="Terminal command">
+                <input type="text" id="terminal-input" autocomplete="off" spellcheck="false" aria-label="Terminal command">
               </div>
             </div>
           </div>
@@ -1398,25 +1433,24 @@
 
     const canvas = document.getElementById("matrix-canvas");
     const ctx = canvas.getContext("2d");
-    const staticCanvas = document.getElementById("static-canvas");
-    const staticCtx = staticCanvas.getContext("2d");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
 
     let matrixActive = false;
+    let matrixFrame = 0;
     let chaosLevel = 0;
     let commandHistory = [];
     let historyIndex = -1;
 
     function resizeCanvases() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      staticCanvas.width = window.innerWidth;
-      staticCanvas.height = window.innerHeight;
+      const renderScale = window.innerWidth < 700 ? 0.42 : 0.58;
+      canvas.width = Math.ceil(window.innerWidth * renderScale);
+      canvas.height = Math.ceil(window.innerHeight * renderScale);
       initMatrixDrops();
     }
 
     const matrixChars = "アイウエオカキクケコサシスセソ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ#$%&?";
-    const fontSize = 15;
+    const fontSize = 12;
     let columns = 0;
     let drops = [];
 
@@ -1442,20 +1476,7 @@
         }
       });
 
-      requestAnimationFrame(drawMatrix);
-    }
-
-    function drawStatic() {
-      if (reducedMotion) return;
-      staticCtx.clearRect(0, 0, staticCanvas.width, staticCanvas.height);
-      staticCtx.fillStyle = "rgba(255, 255, 255, 0.32)";
-      for (let i = 0; i < 180; i++) {
-        const x = Math.random() * staticCanvas.width;
-        const y = Math.random() * staticCanvas.height;
-        const width = 1 + Math.random() * 2;
-        staticCtx.fillRect(x, y, width, 1);
-      }
-      setTimeout(() => requestAnimationFrame(drawStatic), 140);
+      matrixFrame = requestAnimationFrame(drawMatrix);
     }
 
     function toggleMatrix(force) {
@@ -1465,7 +1486,10 @@
       matrixReadout.textContent = matrixActive ? "online" : "offline";
       if (matrixActive) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawMatrix();
+        if (!matrixFrame) drawMatrix();
+      } else if (matrixFrame) {
+        cancelAnimationFrame(matrixFrame);
+        matrixFrame = 0;
       }
     }
 
@@ -1489,17 +1513,30 @@
       }, 520);
     }
 
-    document.addEventListener("mousemove", (event) => {
-      cursorDot.style.left = event.clientX + "px";
-      cursorDot.style.top = event.clientY + "px";
+    let pointerX = 0;
+    let pointerY = 0;
+    let pointerFrame = 0;
+
+    function updatePointerEffects() {
+      pointerFrame = 0;
+      cursorDot.style.left = pointerX + "px";
+      cursorDot.style.top = pointerY + "px";
 
       const rect = earthSystem.getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
-      const deltaX = (event.clientX - centerX) / 38;
-      const deltaY = (event.clientY - centerY) / 38;
+      const deltaX = (pointerX - centerX) / 38;
+      const deltaY = (pointerY - centerY) / 38;
       earth.style.transform = "translate(calc(-50% + " + deltaX + "px), calc(-50% + " + deltaY + "px))";
-    });
+    }
+
+    if (!isCoarsePointer && !reducedMotion) {
+      document.addEventListener("mousemove", (event) => {
+        pointerX = event.clientX;
+        pointerY = event.clientY;
+        if (!pointerFrame) pointerFrame = requestAnimationFrame(updatePointerEffects);
+      }, { passive: true });
+    }
 
     document.querySelectorAll("a, button, input, .project-card, .contact-link").forEach((element) => {
       element.addEventListener("mouseenter", () => cursorDot.classList.add("hot"));
@@ -1746,12 +1783,27 @@ Design preference: useful first, theatrical whenever the budget allows.`,
 
     document.addEventListener("visibilitychange", () => {
       document.title = document.hidden ? "Cary Greenwood // signal lost" : "Cary Greenwood // Arcade Terminal";
+      if (document.hidden && matrixFrame) {
+        cancelAnimationFrame(matrixFrame);
+        matrixFrame = 0;
+      } else if (matrixActive && !matrixFrame) {
+        drawMatrix();
+      }
     });
 
     resizeCanvases();
-    window.addEventListener("resize", resizeCanvases);
-    drawStatic();
-    window.setTimeout(typeDemo, 1100);
+    let resizeTimer = 0;
+    window.addEventListener("resize", () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(resizeCanvases, 120);
+    }, { passive: true });
+
+    const startDemo = () => window.setTimeout(typeDemo, 900);
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(startDemo, { timeout: 2500 });
+    } else {
+      window.setTimeout(startDemo, 1600);
+    }
   </script>
 </body>
 </html>
